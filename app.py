@@ -251,15 +251,15 @@ h1 {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* FIX: Ensure Metric Label (title) is dark against the white box */
+/* FIX: Ensure Metric Label (title) is PURE BLACK against the white box */
 .stMetric label {
-    color: #333333 !important; /* Dark Gray */
+    color: #000000 !important; /* Pure Black */
     font-weight: 500;
 }
 
-/* FIX: Ensure Metric Value (number) is black for high contrast */
+/* FIX: Ensure Metric Value (number) is PURE BLACK for high contrast */
 .stMetric .stMetricValue {
-    color: #000000 !important; /* Black */
+    color: #000000 !important; /* Pure Black */
 }
 </style>
 """, unsafe_allow_html=True)
