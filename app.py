@@ -18,9 +18,9 @@ try:
     scaler = joblib.load(SCALER_PATH)
     st.sidebar.success("Model and Scaler loaded successfully.")
 
-    # --- DEFINITIVE FIX: USING ACTUAL CONTROL CHARACTERS (\r and \n) ---
-    # This list is constructed directly from the joblib metadata (feature_names_in_) 
-    # to match the exact, invisible characters used during training.
+    # --- FINAL DEFINITIVE FIX: MATCHING SCALER'S PARSED FEATURE NAMES ---
+    # Based on debug output, the scaler object loads the names without the 
+    # control characters (\r, \n), but requires specific trailing spaces.
     EXPECTED_FEATURES = [
         # Numerical and Engineered Features
         'Agent_Age', 
@@ -34,24 +34,24 @@ try:
         # Ordinal Encoding
         'Traffic_Encoded', 
         
-        # Weather OHE (FIXED: Using carriage return \r)
+        # Weather OHE (FIXED: Removed \r, matching clean expected names)
         'Weather_Fog', 
         'Weather_Sandstorms', 
         'Weather_Stormy', 
-        '\rWeather_Sunny', # FIXED: Changed space to \r
-        '\rWeather_Windy', # FIXED: Changed space to \r
+        'Weather_Sunny', 
+        'Weather_Windy', 
         
         # Vehicle OHE (Confirmed trailing spaces)
         'Vehicle_motorcycle ', 
         'Vehicle_scooter ', 
         'Vehicle_van', # No space
         
-        # Area OHE (FIXED: Using newline \n where it appeared)
-        '\nArea_Other',     # FIXED: Changed space to \n
+        # Area OHE (FIXED: Removed \n from 'Other', keeping space on Urban/Semi-Urban)
+        'Area_Other',     
         'Area_Semi-Urban ', 
         'Area_Urban ', 
         
-        # Category OHE (FIXED: Reverting to clean names, removing trailing spaces)
+        # Category OHE (Reverted to clean names, no trailing spaces)
         'Category_Books', 
         'Category_Clothing', 
         'Category_Cosmetics', 
@@ -76,7 +76,7 @@ try:
         'Order_DayOfWeek_5.0', 
         'Order_DayOfWeek_6.0'
     ]
-    # --- END DEFINITIVE FIX ---
+    # --- END FINAL DEFINITIVE FIX ---
 
 except FileNotFoundError:
     st.error(f"File not found. Please ensure your model files are in the root directory next to this script.")
@@ -134,16 +134,16 @@ def preprocess_inputs(user_inputs, expected_features):
     traffic_map = {'Low': 0, 'Medium': 1, 'High': 2, 'Jammed': 3}
     df['Traffic_Encoded'] = traffic_map.get(user_inputs['Traffic'], 1)
 
-    # 4. One-Hot Encoding (Map friendly names to ugly, required feature names)
+    # 4. One-Hot Encoding (Map friendly names to the required feature names)
     
-    # Weather (Mapping selected weather to its required name with carriage return \r)
+    # Weather (Mapping selected weather to its required clean name)
     # The baseline is assumed to be 'Cloudy'/'Rainy', which are not in this map.
     weather_map = {
-        'Sunny': '\rWeather_Sunny', # FIXED: Using \r
+        'Sunny': 'Weather_Sunny', # FIXED: Removed \r
         'Fog': 'Weather_Fog', 
         'Sandstorms': 'Weather_Sandstorms',
         'Stormy': 'Weather_Stormy', 
-        'Windy': '\rWeather_Windy', # FIXED: Using \r
+        'Windy': 'Weather_Windy', # FIXED: Removed \r
     }
     weather_col = weather_map.get(user_inputs['Weather'], None)
     if weather_col and weather_col in df.columns: 
@@ -159,11 +159,11 @@ def preprocess_inputs(user_inputs, expected_features):
     if vehicle_col and vehicle_col in df.columns: 
         df[vehicle_col] = 1
 
-    # Area (Mapping selected area to its required name with newline \n or trailing space)
+    # Area (Mapping selected area to its required name. 'Other' is now clean.)
     area_map = {
         'Urban': 'Area_Urban ', 
         'Semi-Urban': 'Area_Semi-Urban ', 
-        'Other': '\nArea_Other' # FIXED: Using \n
+        'Other': 'Area_Other' # FIXED: Removed \n
     }
     area_col = area_map.get(user_inputs['Area'], None)
     if area_col and area_col in df.columns: 
@@ -337,13 +337,34 @@ if st.button("Predict Delivery Time"):
     # 4. Scaling (This should now pass!)
     try:
         X_scaled = scaler.transform(X_predict)
+        
+        # 5. Prediction
+        prediction = model.predict(X_scaled)[0]
+        
+        # 6. Display Results
+        
+        predicted_time = max(1, round(prediction))
+        hours = int(predicted_time // 60)
+        minutes = int(predicted_time % 60)
+        
+        st.markdown("## Prediction Result")
+        
+        col_res1, col_res2, col_res3 = st.columns(3)
+        
+        col_res1.metric(label="Predicted Delivery Time", value=f"~{predicted_time} min")
+        col_res2.metric(label="Equivalent Time", value=f"{hours}h {minutes}m")
+        col_res3.metric(label="Time to Pickup", value=f"{time_to_pickup_minutes:.1f} min")
+
+        st.success(f"The estimated time for this delivery is **{predicted_time} minutes** based on the current {traffic} traffic and {weather} conditions.")
+
+
     except ValueError as e:
-        # If it still fails, print the column names to help debug the final hidden characters
+        # We keep this debug code for extreme cases, but the previous fix should prevent it.
         st.error(f"Final Feature Mismatch Error: {e}")
-        st.warning("The feature names still do not match the fitted scaler. We need to print the expected features from the scaler object to debug the hidden characters.")
+        st.warning("The feature names still do not match the fitted scaler. This indicates a deeply nested issue with the saved model files.")
         
         # --- DEBUG STEP: Print the features for comparison ---
-        st.write("--- Debug Information (Copy this) ---")
+        st.write("--- Final Debug Information (Copy this if the error persists) ---")
         st.write("Expected Features (from scaler.feature_names_in_):")
         st.code(list(scaler.feature_names_in_))
         st.write("Generated Features (X_predict.columns):")
@@ -352,22 +373,3 @@ if st.button("Predict Delivery Time"):
         # --- END DEBUG STEP ---
         
         st.stop()
-    
-    # 5. Prediction
-    prediction = model.predict(X_scaled)[0]
-    
-    # 6. Display Results
-    
-    predicted_time = max(1, round(prediction))
-    hours = int(predicted_time // 60)
-    minutes = int(predicted_time % 60)
-    
-    st.markdown("## Prediction Result")
-    
-    col_res1, col_res2, col_res3 = st.columns(3)
-    
-    col_res1.metric(label="Predicted Delivery Time", value=f"~{predicted_time} min")
-    col_res2.metric(label="Equivalent Time", value=f"{hours}h {minutes}m")
-    col_res3.metric(label="Time to Pickup", value=f"{time_to_pickup_minutes:.1f} min")
-
-    st.success(f"The estimated time for this delivery is **{predicted_time} minutes** based on the current {traffic} traffic and {weather} conditions.")
