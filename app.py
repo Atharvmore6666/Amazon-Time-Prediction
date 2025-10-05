@@ -215,7 +215,7 @@ st.markdown("""
 <style>
 /* Header/Title */
 h1 {
-    color: #FF9900; /* Amazon Yellow */
+    color: #007bff; /* Blue */
     font-weight: 700;
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
 }
@@ -225,10 +225,10 @@ h1 {
     color: white; /* Text in dark sidebar */
 }
 
-/* Prediction Button (Styled like Amazon 'Proceed' button) */
+/* Prediction Button (Styled for Blue theme) */
 .stButton>button {
-    background-color: #FF9900; /* Amazon Yellow */
-    color: #111111;
+    background-color: #007bff; /* Blue */
+    color: #ffffff; /* White text on blue button */
     font-weight: bold;
     border-radius: 6px;
     padding: 10px 20px;
@@ -238,7 +238,7 @@ h1 {
 }
 
 .stButton>button:hover {
-    background-color: #ffb84d;
+    background-color: #0056b3; /* Darker blue on hover */
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
 }
 
@@ -247,19 +247,19 @@ h1 {
     background-color: white;
     padding: 15px;
     border-radius: 10px;
-    border: 1px solid #FF9900;
+    border: 1px solid #007bff; /* Blue border */
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* FIX: Ensure Metric Label (title) is PURE BLACK against the white box */
+/* FIX: Ensure Metric Label (title) is PURE BLACK for high contrast */
 .stMetric label {
     color: #000000 !important; /* Pure Black */
     font-weight: 500;
 }
 
-/* FIX: Ensure Metric Value (number) is PURE BLACK for high contrast */
+/* FIX: Ensure Metric Value (number) is a deep green (non-neon) */
 .stMetric .stMetricValue {
-    color: #000000 !important; /* Pure Black */
+    color: #196f3d !important; /* Deep Forest Green */
 }
 </style>
 """, unsafe_allow_html=True)
