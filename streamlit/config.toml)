@@ -1,0 +1,11 @@
+[theme]
+# Primary color (Amazon Yellow)
+primaryColor = "#FF9900"
+# Background for the main app area (Light Gray/White)
+backgroundColor = "#F7F7F7"
+# Background for the sidebar/secondary elements (Dark Black/Blue)
+secondaryBackgroundColor = "#232F3E"
+# Text color (Black)
+textColor = "#111111"
+# Font used
+font = "sans serif"
