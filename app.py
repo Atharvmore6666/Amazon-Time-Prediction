@@ -7,17 +7,10 @@ from math import radians, sin, cos, sqrt, atan2
 
 # --- CONFIGURATION AND MODEL LOADING ---
 
-# Define paths relative to the app.py file
-# FIX: Use the script's directory (__file__) to ensure paths are absolute and reliable
+# Define paths relative to the app.py file (assuming model files are in the root directory)
 current_dir = os.path.dirname(__file__)
-# --- EDITED PATHS TO LOOK IN THE ROOT DIRECTORY ---
 MODEL_PATH = os.path.join(current_dir, 'best_delivery_time_predictor.joblib')
 SCALER_PATH = os.path.join(current_dir, 'feature_scaler.joblib')
-# --- END EDITED PATHS ---
-
-# IMPORTANT: You must save the list of expected features from your training data!
-# For deployment, we assume the feature list is saved here:
-# COLUMNS_PATH = os.path.join(current_dir, 'model_features.joblib') 
 
 try:
     # Load the trained model and scaler
@@ -25,23 +18,41 @@ try:
     scaler = joblib.load(SCALER_PATH)
     st.sidebar.success("Model and Scaler loaded successfully.")
 
-    # Mock features list (Replace this with the actual loading of your saved list!)
-    EXPECTED_FEATURES = ['Agent_Age', 'Agent_Rating', 'Travel_Distance_km', 'Time_to_Pickup_minutes',
-                        'Order_Hour_sin', 'Order_Hour_cos', 'Is_Weekend', 'Traffic_Encoded',
-                        'Weather_Cloudy', 'Weather_Fog', 'Weather_Rainy', 'Weather_Sandstorms', 
-                        'Weather_Stormy', 'Weather_Windy', 'Vehicle_Electric_Vehicle', 
-                        'Vehicle_Motorcycle', 'Vehicle_Scooter', 'Area_Urban', 'Area_Rural',
-                        'Category_Electronics', 'Category_Food', 'Category_Grocery', 
-                        'Order_DayOfWeek_1', 'Order_DayOfWeek_2', 'Order_DayOfWeek_3',
-                        'Order_DayOfWeek_4', 'Order_DayOfWeek_5', 'Order_DayOfWeek_6'
-                        ]
+    # --- FIX: DEFENSIVE FEATURE LIST ---
+    # This list MUST contain EVERY single feature generated during the training phase,
+    # including those with zero variance or rare categories that might have been
+    # dropped by your one-hot encoding setup. The error message indicates these exact columns are missing.
+    EXPECTED_FEATURES = [
+        'Agent_Age', 'Agent_Rating', 'Travel_Distance_km', 'Time_to_Pickup_minutes',
+        'Order_Hour_sin', 'Order_Hour_cos', 'Is_Weekend', 
+        
+        # Ordinal Encoding for Traffic (0-3)
+        'Traffic_Encoded', 
+        
+        # Full OHE columns based on the error message and standard OHE (must include all levels used in training)
+        'Weather_Cloudy', 'Weather_Fog', 'Weather_Rainy', 'Weather_Sandstorms', 'Weather_Stormy', 
+        'Weather_Windy', 'Weather_Sunny', # Added 'Weather_Sunny' (often baseline)
+        
+        'Vehicle_Electric_Vehicle', 'Vehicle_Motorcycle', 'Vehicle_Scooter', 
+        
+        # Area OHE (Must include all levels seen during fit time)
+        'Area_Metro', 'Area_Rural', 'Area_Urban', # Added 'Area_Metro' (assuming it was the baseline)
+        
+        # Category OHE (Must include all levels seen during fit time)
+        'Category_Electronics', 'Category_Food', 'Category_Grocery', 
+        'Category_Books', 'Category_Clothing', # Added missing categories from error log
+        
+        # Day of Week OHE (Monday=0 is the implicit baseline if drop_first=True)
+        'Order_DayOfWeek_1', 'Order_DayOfWeek_2', 'Order_DayOfWeek_3',
+        'Order_DayOfWeek_4', 'Order_DayOfWeek_5', 'Order_DayOfWeek_6'
+    ]
+    # --- END FIX ---
 
-except FileNotFoundError as e:
-    # Update error message to confirm the full path being checked
-    st.error(f"File not found: {MODEL_PATH}. Please ensure your model files are in the repository's root directory next to this script.")
+except FileNotFoundError:
+    st.error(f"File not found. Please ensure your model files are in the root directory next to this script.")
     st.stop()
 except Exception as e:
-    st.error(f"An error occurred during model loading: {e}")
+    st.error(f"An error occurred during model loading: {type(e).__name__}: {e}")
     st.stop()
 
 
@@ -81,21 +92,20 @@ def preprocess_inputs(user_inputs, expected_features):
     expected by the trained ML model.
     """
     
-    # 1. Initialize DataFrame with all expected features set to 0
+    # 1. Initialize DataFrame with ALL expected features set to 0
+    # This is the fix: ensures the resulting DataFrame has the exact column structure the model needs.
     df = pd.DataFrame(0, index=[0], columns=expected_features)
 
     # 2. Add Numerical and Engineered Features
     for key in ['Agent_Age', 'Agent_Rating', 'Travel_Distance_km', 'Time_to_Pickup_minutes',
                 'Order_Hour_sin', 'Order_Hour_cos', 'Is_Weekend']:
-        if key in df.columns:
-            df[key] = user_inputs[key]
+        df[key] = user_inputs[key]
 
     # 3. Ordinal Encoding for Traffic (0=Low, 1=Medium, 2=High, 3=Jammed)
     traffic_map = {'Low': 0, 'Medium': 1, 'High': 2, 'Jammed': 3}
-    if 'Traffic_Encoded' in df.columns:
-        df['Traffic_Encoded'] = traffic_map.get(user_inputs['Traffic'], 1)
+    df['Traffic_Encoded'] = traffic_map.get(user_inputs['Traffic'], 1)
 
-    # 4. One-Hot Encoding for Categorical Features
+    # 4. One-Hot Encoding (Set the relevant feature column to 1)
     
     # Weather
     weather_col = f"Weather_{user_inputs['Weather']}"
@@ -105,11 +115,10 @@ def preprocess_inputs(user_inputs, expected_features):
     vehicle_col = f"Vehicle_{user_inputs['Vehicle']}"
     if vehicle_col in df.columns: df[vehicle_col] = 1
 
-    # Area (Assuming Metro is baseline/other and Urban/Rural are OHE columns)
-    area_map = {'Urban': 'Area_Urban', 'Rural': 'Area_Rural'}
-    area_col = area_map.get(user_inputs['Area'])
-    if area_col and area_col in df.columns: df[area_col] = 1
-
+    # Area
+    area_col = f"Area_{user_inputs['Area']}"
+    if area_col in df.columns: df[area_col] = 1
+    
     # Category
     category_col = f"Category_{user_inputs['Category']}"
     if category_col in df.columns: df[category_col] = 1
@@ -120,8 +129,8 @@ def preprocess_inputs(user_inputs, expected_features):
         day_col = f'Order_DayOfWeek_{order_dayofweek}'
         if day_col in df.columns: df[day_col] = 1
 
-    # 5. Return the dataframe with the exact order of features
-    return df[expected_features]
+    # 5. The DataFrame 'df' now has the perfect structure and order.
+    return df
 
 
 # --- STREAMLIT APP LAYOUT & LOGIC ---
@@ -210,6 +219,7 @@ with col1:
     drop_lat = st.number_input("Drop-off Latitude", value=12.98, format="%.4f")
     drop_lon = st.number_input("Drop-off Longitude", value=77.58, format="%.4f")
     
+    # Updated Area selectbox to include the 'Metro' baseline
     area = st.selectbox("Delivery Area Type", options=['Urban', 'Metro', 'Rural'], index=0)
 
 with col2:
@@ -219,7 +229,7 @@ with col2:
     weather = st.selectbox("Weather Condition", options=['Sunny', 'Cloudy', 'Rainy', 'Windy', 'Stormy', 'Sandstorms'], index=0)
     
     vehicle = st.selectbox("Vehicle Type", options=['Scooter', 'Motorcycle', 'Electric_Vehicle'], index=0)
-    category = st.selectbox("Order Category", options=['Food', 'Electronics', 'Grocery'], index=0)
+    category = st.selectbox("Order Category", options=['Food', 'Electronics', 'Grocery', 'Books', 'Clothing'], index=0)
 
 
 # --- PREDICTION TRIGGER ---
@@ -249,9 +259,10 @@ if st.button("Predict Delivery Time"):
     }
 
     # 3. Preprocess and get the exact feature vector
+    # This step now ensures the correct column names and order
     X_predict = preprocess_inputs(raw_inputs, EXPECTED_FEATURES)
 
-    # 4. Scaling
+    # 4. Scaling (The scaler expects all features, even if they are 0)
     X_scaled = scaler.transform(X_predict)
     
     # 5. Prediction
