@@ -19,9 +19,7 @@ try:
     st.sidebar.success("Model and Scaler loaded successfully.")
 
     # --- FIX: DEFENSIVE FEATURE LIST ---
-    # This list MUST contain EVERY single feature generated during the training phase,
-    # including those with zero variance or rare categories that might have been
-    # dropped by your one-hot encoding setup. The error message indicates these exact columns are missing.
+    # UPDATED: Adding all missing Area and Category columns reported in the latest error.
     EXPECTED_FEATURES = [
         'Agent_Age', 'Agent_Rating', 'Travel_Distance_km', 'Time_to_Pickup_minutes',
         'Order_Hour_sin', 'Order_Hour_cos', 'Is_Weekend', 
@@ -29,18 +27,18 @@ try:
         # Ordinal Encoding for Traffic (0-3)
         'Traffic_Encoded', 
         
-        # Full OHE columns based on the error message and standard OHE (must include all levels used in training)
+        # Full OHE columns (Ensuring consistency with training set)
         'Weather_Cloudy', 'Weather_Fog', 'Weather_Rainy', 'Weather_Sandstorms', 'Weather_Stormy', 
-        'Weather_Windy', 'Weather_Sunny', # Added 'Weather_Sunny' (often baseline)
+        'Weather_Windy', 'Weather_Sunny', 
         
         'Vehicle_Electric_Vehicle', 'Vehicle_Motorcycle', 'Vehicle_Scooter', 
         
-        # Area OHE (Must include all levels seen during fit time)
-        'Area_Metro', 'Area_Rural', 'Area_Urban', # Added 'Area_Metro' (assuming it was the baseline)
+        # Area OHE (Now includes ALL training categories)
+        'Area_Metro', 'Area_Rural', 'Area_Urban', 'Area_Other', 'Area_Semi-Urban',
         
-        # Category OHE (Must include all levels seen during fit time)
+        # Category OHE (Now includes ALL training categories)
         'Category_Electronics', 'Category_Food', 'Category_Grocery', 
-        'Category_Books', 'Category_Clothing', # Added missing categories from error log
+        'Category_Books', 'Category_Clothing', 'Category_Cosmetics', 'Category_Home',
         
         # Day of Week OHE (Monday=0 is the implicit baseline if drop_first=True)
         'Order_DayOfWeek_1', 'Order_DayOfWeek_2', 'Order_DayOfWeek_3',
@@ -93,7 +91,6 @@ def preprocess_inputs(user_inputs, expected_features):
     """
     
     # 1. Initialize DataFrame with ALL expected features set to 0
-    # This is the fix: ensures the resulting DataFrame has the exact column structure the model needs.
     df = pd.DataFrame(0, index=[0], columns=expected_features)
 
     # 2. Add Numerical and Engineered Features
@@ -219,8 +216,8 @@ with col1:
     drop_lat = st.number_input("Drop-off Latitude", value=12.98, format="%.4f")
     drop_lon = st.number_input("Drop-off Longitude", value=77.58, format="%.4f")
     
-    # Updated Area selectbox to include the 'Metro' baseline
-    area = st.selectbox("Delivery Area Type", options=['Urban', 'Metro', 'Rural'], index=0)
+    # UPDATED: Added missing Area categories to the select box
+    area = st.selectbox("Delivery Area Type", options=['Urban', 'Metro', 'Rural', 'Other', 'Semi-Urban'], index=0)
 
 with col2:
     st.subheader("Environmental & Order Factors")
@@ -229,7 +226,8 @@ with col2:
     weather = st.selectbox("Weather Condition", options=['Sunny', 'Cloudy', 'Rainy', 'Windy', 'Stormy', 'Sandstorms'], index=0)
     
     vehicle = st.selectbox("Vehicle Type", options=['Scooter', 'Motorcycle', 'Electric_Vehicle'], index=0)
-    category = st.selectbox("Order Category", options=['Food', 'Electronics', 'Grocery', 'Books', 'Clothing'], index=0)
+    # UPDATED: Added missing Category categories to the select box
+    category = st.selectbox("Order Category", options=['Food', 'Electronics', 'Grocery', 'Books', 'Clothing', 'Cosmetics', 'Home'], index=0)
 
 
 # --- PREDICTION TRIGGER ---
@@ -259,7 +257,6 @@ if st.button("Predict Delivery Time"):
     }
 
     # 3. Preprocess and get the exact feature vector
-    # This step now ensures the correct column names and order
     X_predict = preprocess_inputs(raw_inputs, EXPECTED_FEATURES)
 
     # 4. Scaling (The scaler expects all features, even if they are 0)
