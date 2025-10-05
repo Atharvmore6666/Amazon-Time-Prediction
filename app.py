@@ -18,33 +18,56 @@ try:
     scaler = joblib.load(SCALER_PATH)
     st.sidebar.success("Model and Scaler loaded successfully.")
 
-    # --- FIX: DEFENSIVE FEATURE LIST ---
-    # UPDATED: Adding all missing Area and Category columns reported in the latest error.
+    # --- DEFINITIVE FIX: EXACT FEATURE LIST FROM feature_scaler.joblib ---
+    # This list is extracted directly from the saved scaler file. 
+    # It MUST be exact, including the order and any trailing spaces.
     EXPECTED_FEATURES = [
-        'Agent_Age', 'Agent_Rating', 'Travel_Distance_km', 'Time_to_Pickup_minutes',
-        'Order_Hour_sin', 'Order_Hour_cos', 'Is_Weekend', 
+        # Numerical and Engineered Features (Order adjusted based on scaler)
+        'Agent_Age', 
+        'Agent_Rating', 
+        'Travel_Distance_km', 
+        'Time_to_Pickup_minutes',
+        'Is_Weekend',              # Moved up in your training data
+        'Order_Hour_sin', 
+        'Order_Hour_cos', 
         
-        # Ordinal Encoding for Traffic (0-3)
+        # Ordinal Encoding
         'Traffic_Encoded', 
         
-        # Full OHE columns (Ensuring consistency with training set)
-        'Weather_Cloudy', 'Weather_Fog', 'Weather_Rainy', 'Weather_Sandstorms', 'Weather_Stormy', 
-        'Weather_Windy', 'Weather_Sunny', 
+        # Weather OHE (Note: 'Cloudy' and 'Rainy' are missing/were the baseline)
+        'Weather_Fog', 
+        'Weather_Sandstorms', 
+        'Weather_Stormy', 
+        'Weather_Sunny', 
+        'Weather_Windy', 
         
-        'Vehicle_Electric_Vehicle', 'Vehicle_Motorcycle', 'Vehicle_Scooter', 
+        # Vehicle OHE (Note: Names are lowercase and have trailing spaces, 'van' instead of 'Electric_Vehicle')
+        'Vehicle_motorcycle ', 
+        'Vehicle_scooter ', 
+        'Vehicle_van',
         
-        # Area OHE (Now includes ALL training categories)
-        'Area_Metro', 'Area_Rural', 'Area_Urban', 'Area_Other', 'Area_Semi-Urban',
+        # Area OHE (Note: 'Metro' and 'Rural' are missing, spaces in names)
+        'Area_Other', 
+        'Area_Semi-Urban ', 
+        'Area_Urban ', 
         
-        # Category OHE (Now includes ALL training categories)
-        'Category_Electronics', 'Category_Food', 'Category_Grocery', 
-        'Category_Books', 'Category_Clothing', 'Category_Cosmetics', 'Category_Home',
+        # Category OHE (Note: Missing 'Food', 'Home'; Includes 'Toys')
+        'Category_Books', 
+        'Category_Clothing', 
+        'Category_Cosmetics', 
+        'Category_Electronics', 
+        'Category_Grocery', 
+        'Category_Toys',
         
-        # Day of Week OHE (Monday=0 is the implicit baseline if drop_first=True)
-        'Order_DayOfWeek_1', 'Order_DayOfWeek_2', 'Order_DayOfWeek_3',
-        'Order_DayOfWeek_4', 'Order_DayOfWeek_5', 'Order_DayOfWeek_6'
+        # Day of Week OHE (Note: Names include the '.0' suffix)
+        'Order_DayOfWeek_1.0', 
+        'Order_DayOfWeek_2.0', 
+        'Order_DayOfWeek_3.0',
+        'Order_DayOfWeek_4.0', 
+        'Order_DayOfWeek_5.0', 
+        'Order_DayOfWeek_6.0'
     ]
-    # --- END FIX ---
+    # --- END DEFINITIVE FIX ---
 
 except FileNotFoundError:
     st.error(f"File not found. Please ensure your model files are in the root directory next to this script.")
@@ -93,41 +116,74 @@ def preprocess_inputs(user_inputs, expected_features):
     # 1. Initialize DataFrame with ALL expected features set to 0
     df = pd.DataFrame(0, index=[0], columns=expected_features)
 
-    # 2. Add Numerical and Engineered Features
+    # 2. Add Numerical and Engineered Features (Note: Is_Weekend is included here, matching its position in EXPECTED_FEATURES)
     for key in ['Agent_Age', 'Agent_Rating', 'Travel_Distance_km', 'Time_to_Pickup_minutes',
-                'Order_Hour_sin', 'Order_Hour_cos', 'Is_Weekend']:
-        df[key] = user_inputs[key]
-
+                'Is_Weekend', 'Order_Hour_sin', 'Order_Hour_cos']:
+        # Ensure we only try to assign keys that are in the raw_inputs dictionary
+        if key in user_inputs: 
+            df[key] = user_inputs[key]
+    
     # 3. Ordinal Encoding for Traffic (0=Low, 1=Medium, 2=High, 3=Jammed)
     traffic_map = {'Low': 0, 'Medium': 1, 'High': 2, 'Jammed': 3}
     df['Traffic_Encoded'] = traffic_map.get(user_inputs['Traffic'], 1)
 
     # 4. One-Hot Encoding (Set the relevant feature column to 1)
     
-    # Weather
-    weather_col = f"Weather_{user_inputs['Weather']}"
-    if weather_col in df.columns: df[weather_col] = 1
+    # Weather (Note: 'Cloudy' and 'Rainy' inputs are now mapped to the implicit baseline if they were chosen)
+    weather_map = {
+        'Sunny': 'Weather_Sunny', 'Fog': 'Weather_Fog', 'Sandstorms': 'Weather_Sandstorms',
+        'Stormy': 'Weather_Stormy', 'Windy': 'Weather_Windy', 
+        # Inputs like 'Cloudy' and 'Rainy' will now fall to the baseline (all OHE columns remain 0)
+    }
+    weather_col = weather_map.get(user_inputs['Weather'], None)
+    if weather_col and weather_col in df.columns: 
+        df[weather_col] = 1
 
-    # Vehicle
-    vehicle_col = f"Vehicle_{user_inputs['Vehicle']}"
-    if vehicle_col in df.columns: df[vehicle_col] = 1
+    # Vehicle (Handling lowercase names and trailing spaces)
+    # Mapping the user-friendly input to the ugly column name
+    vehicle_map = {
+        'Motorcycle': 'Vehicle_motorcycle ', 
+        'Scooter': 'Vehicle_scooter ', 
+        'Van': 'Vehicle_van',
+        # 'Electric_Vehicle' inputs will now fall to the baseline (all OHE columns remain 0)
+    }
+    vehicle_col = vehicle_map.get(user_inputs['Vehicle'], None)
+    if vehicle_col and vehicle_col in df.columns: 
+        df[vehicle_col] = 1
 
-    # Area
-    area_col = f"Area_{user_inputs['Area']}"
-    if area_col in df.columns: df[area_col] = 1
+    # Area (Handling trailing spaces)
+    area_map = {
+        'Urban': 'Area_Urban ', 
+        'Semi-Urban': 'Area_Semi-Urban ', 
+        'Other': 'Area_Other'
+        # 'Metro' and 'Rural' inputs will now fall to the baseline
+    }
+    area_col = area_map.get(user_inputs['Area'], None)
+    if area_col and area_col in df.columns: 
+        df[area_col] = 1
     
-    # Category
-    category_col = f"Category_{user_inputs['Category']}"
-    if category_col in df.columns: df[category_col] = 1
+    # Category (Handling missing categories)
+    category_map = {
+        'Books': 'Category_Books', 
+        'Clothing': 'Category_Clothing', 
+        'Cosmetics': 'Category_Cosmetics', 
+        'Electronics': 'Category_Electronics', 
+        'Grocery': 'Category_Grocery', 
+        'Toys': 'Category_Toys',
+        # 'Food' and 'Home' inputs will now fall to the baseline
+    }
+    category_col = category_map.get(user_inputs['Category'], None)
+    if category_col and category_col in df.columns: 
+        df[category_col] = 1
     
-    # Day of Week (Monday=0 is the implicit baseline if drop_first=True)
+    # Day of Week (Handling the '.0' suffix)
     order_dayofweek = user_inputs['Order_DayOfWeek']
     if order_dayofweek > 0:
-        day_col = f'Order_DayOfWeek_{order_dayofweek}'
+        day_col = f'Order_DayOfWeek_{order_dayofweek}.0'
         if day_col in df.columns: df[day_col] = 1
 
-    # 5. The DataFrame 'df' now has the perfect structure and order.
-    return df
+    # 5. Explicitly return columns in the EXPECTED_FEATURES order
+    return df[expected_features]
 
 
 # --- STREAMLIT APP LAYOUT & LOGIC ---
@@ -216,18 +272,21 @@ with col1:
     drop_lat = st.number_input("Drop-off Latitude", value=12.98, format="%.4f")
     drop_lon = st.number_input("Drop-off Longitude", value=77.58, format="%.4f")
     
-    # UPDATED: Added missing Area categories to the select box
-    area = st.selectbox("Delivery Area Type", options=['Urban', 'Metro', 'Rural', 'Other', 'Semi-Urban'], index=0)
+    # UPDATED: Only areas present in the model training data
+    area = st.selectbox("Delivery Area Type", options=['Urban', 'Other', 'Semi-Urban'], index=0)
 
 with col2:
     st.subheader("Environmental & Order Factors")
     
     traffic = st.selectbox("Traffic Condition", options=['Low', 'Medium', 'High', 'Jammed'], index=1)
-    weather = st.selectbox("Weather Condition", options=['Sunny', 'Cloudy', 'Rainy', 'Windy', 'Stormy', 'Sandstorms'], index=0)
+    # Note: 'Cloudy' and 'Rainy' removed as they weren't OHE in your model
+    weather = st.selectbox("Weather Condition", options=['Sunny', 'Fog', 'Sandstorms', 'Stormy', 'Windy'], index=0) 
     
-    vehicle = st.selectbox("Vehicle Type", options=['Scooter', 'Motorcycle', 'Electric_Vehicle'], index=0)
-    # UPDATED: Added missing Category categories to the select box
-    category = st.selectbox("Order Category", options=['Food', 'Electronics', 'Grocery', 'Books', 'Clothing', 'Cosmetics', 'Home'], index=0)
+    # UPDATED: Only vehicles present in the model training data (Van instead of Electric_Vehicle)
+    vehicle = st.selectbox("Vehicle Type", options=['Scooter', 'Motorcycle', 'Van'], index=0)
+    
+    # UPDATED: Only categories present in the model training data (Toys added; Food/Home removed)
+    category = st.selectbox("Order Category", options=['Electronics', 'Grocery', 'Books', 'Clothing', 'Cosmetics', 'Toys'], index=0)
 
 
 # --- PREDICTION TRIGGER ---
@@ -245,9 +304,9 @@ if st.button("Predict Delivery Time"):
         'Agent_Rating': agent_rating,
         'Travel_Distance_km': travel_distance_km,
         'Time_to_Pickup_minutes': time_to_pickup_minutes,
-        'Order_Hour_sin': order_hour_sin,
-        'Order_Hour_cos': order_hour_cos,
-        'Is_Weekend': is_weekend,
+        'Is_Weekend': is_weekend, # Order adjusted
+        'Order_Hour_sin': order_hour_sin, # Order adjusted
+        'Order_Hour_cos': order_hour_cos, # Order adjusted
         'Traffic': traffic,
         'Weather': weather,
         'Vehicle': vehicle,
@@ -259,7 +318,7 @@ if st.button("Predict Delivery Time"):
     # 3. Preprocess and get the exact feature vector
     X_predict = preprocess_inputs(raw_inputs, EXPECTED_FEATURES)
 
-    # 4. Scaling (The scaler expects all features, even if they are 0)
+    # 4. Scaling (This line should now pass!)
     X_scaled = scaler.transform(X_predict)
     
     # 5. Prediction
