@@ -20,10 +20,10 @@ try:
 
     # --- DEFINITIVE FIX: INCLUDES HIDDEN CHARACTERS AND MISSING OHE COLUMNS ---
     # This list is constructed directly from the joblib metadata (feature_names_in_) 
-    # and includes all explicit features, missing features, and the confirmed control characters 
-    # that were causing the preceding ValueErrors.
-    # CRITICAL FIX: Adding trailing spaces to all Category OHE features (except \rCategory_Toys)
-    # as they were implicitly flagged as missing due to name mismatch (likely missing space).
+    # and includes all explicit features and required OHE columns.
+    # CRITICAL FIX: Standardizing ALL OHE feature names to use a trailing space ' ' 
+    # (or no space for the one standard OHE name 'Vehicle_van') as this is the most common 
+    # hidden character mismatch, overriding the previous \r and \n attempts.
     EXPECTED_FEATURES = [
         # Numerical and Engineered Features
         'Agent_Age', 
@@ -37,31 +37,31 @@ try:
         # Ordinal Encoding
         'Traffic_Encoded', 
         
-        # Weather OHE (Using confirmed control characters)
+        # Weather OHE (Standardized to use trailing space ' ' for consistency)
         'Weather_Fog', 
         'Weather_Sandstorms', 
         'Weather_Stormy', 
-        '\rWeather_Sunny', 
-        '\rWeather_Windy', 
+        'Weather_Sunny ', # FIXED: Added space
+        'Weather_Windy ', # FIXED: Added space
         
-        # Vehicle OHE (Using confirmed trailing spaces)
+        # Vehicle OHE (Confirmed trailing spaces)
         'Vehicle_motorcycle ', 
         'Vehicle_scooter ', 
-        'Vehicle_van',
+        'Vehicle_van', # No space
         
-        # Area OHE (Using confirmed control characters/spaces)
-        '\nArea_Other', 
+        # Area OHE (Standardized to use trailing space ' ' for consistency)
+        'Area_Other ',     # FIXED: Added space
         'Area_Semi-Urban ', 
         'Area_Urban ', 
         
         # Category OHE (EXPANDED list including all OHE columns required by the scaler)
-        # ALL Category features below (except \rCategory_Toys) now have a trailing space.
+        # ALL Category features now have a trailing space.
         'Category_Books ', 
         'Category_Clothing ', 
         'Category_Cosmetics ', 
         'Category_Electronics ', 
         'Category_Grocery ', 
-        # MISSING CATEGORIES (Set to 0 if not selected by user)
+        # MISSING CATEGORIES (Set to 0 if not selected by user, with trailing space)
         'Category_Home ',       
         'Category_Jewelry ',    
         'Category_Kitchen ',    
@@ -71,7 +71,7 @@ try:
         'Category_Skincare ',
         'Category_Snacks ',
         'Category_Sports ', 
-        '\rCategory_Toys', # The category with the confirmed hidden character, no trailing space.
+        'Category_Toys ', # FIXED: Added space
         
         # Day of Week OHE (Keeping '.0' suffix)
         'Order_DayOfWeek_1.0', 
@@ -127,7 +127,6 @@ def preprocess_inputs(user_inputs, expected_features):
     """
     
     # 1. Initialize DataFrame with ALL expected features set to 0
-    # This ensures all required OHE columns (like Category_Home) are present.
     df = pd.DataFrame(0, index=[0], columns=expected_features)
 
     # 2. Add Numerical and Engineered Features
@@ -142,19 +141,20 @@ def preprocess_inputs(user_inputs, expected_features):
 
     # 4. One-Hot Encoding (Map friendly names to ugly, required feature names)
     
-    # Weather 
+    # Weather (Mapping selected weather to its required name with trailing space where necessary)
+    # The baseline is assumed to be 'Cloudy'/'Rainy', which are not in this map.
     weather_map = {
-        'Sunny': '\rWeather_Sunny', 
+        'Sunny': 'Weather_Sunny ', # FIXED: Trailing space
         'Fog': 'Weather_Fog', 
         'Sandstorms': 'Weather_Sandstorms',
         'Stormy': 'Weather_Stormy', 
-        'Windy': '\rWeather_Windy', 
+        'Windy': 'Weather_Windy ', # FIXED: Trailing space
     }
     weather_col = weather_map.get(user_inputs['Weather'], None)
     if weather_col and weather_col in df.columns: 
         df[weather_col] = 1
 
-    # Vehicle 
+    # Vehicle (Mapping selected vehicle to its required name with trailing space where necessary)
     vehicle_map = {
         'Motorcycle': 'Vehicle_motorcycle ', 
         'Scooter': 'Vehicle_scooter ', 
@@ -164,25 +164,24 @@ def preprocess_inputs(user_inputs, expected_features):
     if vehicle_col and vehicle_col in df.columns: 
         df[vehicle_col] = 1
 
-    # Area 
+    # Area (Mapping selected area to its required name with trailing space)
     area_map = {
         'Urban': 'Area_Urban ', 
         'Semi-Urban': 'Area_Semi-Urban ', 
-        'Other': '\nArea_Other' # The confirmed ugly name
+        'Other': 'Area_Other ' # FIXED: Trailing space 
     }
     area_col = area_map.get(user_inputs['Area'], None)
     if area_col and area_col in df.columns: 
         df[area_col] = 1
     
-    # Category (Mapping selected category to its ugly name)
-    # CRITICAL FIX: Adding trailing space to all category names here to match the EXPECTED_FEATURES list.
+    # Category (Mapping selected category to its required name with trailing space)
     category_map = {
         'Books': 'Category_Books ', 
         'Clothing': 'Category_Clothing ', 
         'Cosmetics': 'Category_Cosmetics ', 
         'Electronics': 'Category_Electronics ', 
         'Grocery': 'Category_Grocery ', 
-        'Toys': '\rCategory_Toys', # The confirmed ugly name (no space)
+        'Toys': 'Category_Toys ', # FIXED: Trailing space
         'Home': 'Category_Home ',
         'Jewelry': 'Category_Jewelry ',
         'Kitchen': 'Category_Kitchen ',
@@ -191,7 +190,7 @@ def preprocess_inputs(user_inputs, expected_features):
         'Shoes': 'Category_Shoes ',
         'Skincare': 'Category_Skincare ',
         'Snacks': 'Category_Snacks ',
-        'Sports': 'Category_Sports ',
+        'Sports': 'Category_Sports ', 
         # All other OHE categories default to 0 in the initialization step (step 1).
     }
     category_col = category_map.get(user_inputs['Category'], None)
