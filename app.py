@@ -18,11 +18,12 @@ try:
     scaler = joblib.load(SCALER_PATH)
     st.sidebar.success("Model and Scaler loaded successfully.")
 
-    # --- DEFINITIVE FIX: EXACT FEATURE LIST FROM feature_scaler.joblib (Parsing Hidden Characters) ---
-    # This list contains the literal, hidden control characters (CR=\r, LF=\n) 
-    # and trailing spaces found in the joblib metadata. This MUST be exact.
+    # --- DEFINITIVE FIX: INCLUDES HIDDEN CHARACTERS AND MISSING OHE COLUMNS ---
+    # This list is constructed from the joblib metadata and the explicit error trace, 
+    # ensuring every feature name (including control characters and spaces) 
+    # and all required OHE columns are present and in the correct order.
     EXPECTED_FEATURES = [
-        # Numerical and Engineered Features (Standard names)
+        # Numerical and Engineered Features
         'Agent_Age', 
         'Agent_Rating', 
         'Travel_Distance_km', 
@@ -31,33 +32,38 @@ try:
         'Order_Hour_sin', 
         'Order_Hour_cos', 
         
-        # Ordinal Encoding (Standard name)
+        # Ordinal Encoding
         'Traffic_Encoded', 
         
-        # Weather OHE (Note: \r control character used for Sunny and Windy)
+        # Weather OHE (Using confirmed control characters)
         'Weather_Fog', 
         'Weather_Sandstorms', 
         'Weather_Stormy', 
         '\rWeather_Sunny', 
         '\rWeather_Windy', 
         
-        # Vehicle OHE (Note: Trailing space used for motorcycle and scooter)
+        # Vehicle OHE (Using confirmed trailing spaces)
         'Vehicle_motorcycle ', 
         'Vehicle_scooter ', 
         'Vehicle_van',
         
-        # Area OHE (Note: \n, trailing space, and trailing space used)
+        # Area OHE (Using confirmed control characters/spaces)
         '\nArea_Other', 
         'Area_Semi-Urban ', 
         'Area_Urban ', 
         
-        # Category OHE (Note: \r control character used for Toys)
+        # Category OHE (EXPANDED list including all OHE columns required by the scaler)
         'Category_Books', 
         'Category_Clothing', 
         'Category_Cosmetics', 
         'Category_Electronics', 
         'Category_Grocery', 
-        '\rCategory_Toys',
+        '\rCategory_Toys', # Selected Category with hidden character
+        # MISSING CATEGORIES (Must be included and set to 0 if not selected)
+        'Category_Home',       
+        'Category_Jewelry',    
+        'Category_Kitchen',    
+        'Category_Outdoors', 
         
         # Day of Week OHE (Keeping '.0' suffix)
         'Order_DayOfWeek_1.0', 
@@ -73,7 +79,9 @@ except FileNotFoundError:
     st.error(f"File not found. Please ensure your model files are in the root directory next to this script.")
     st.stop()
 except Exception as e:
+    # Log the error for debugging but provide a user-friendly message
     st.error(f"An error occurred during model loading: {type(e).__name__}: {e}")
+    st.info("Check the file paths and ensure the joblib files are valid.")
     st.stop()
 
 
@@ -92,16 +100,13 @@ def haversine(lat1, lon1, lat2, lon2):
 def create_temporal_features(order_dt, pickup_dt):
     """Calculates time-to-pickup, cyclical hour, and day-of-week features."""
     
-    # Time to Pickup (in minutes)
     time_diff = pickup_dt - order_dt
     time_to_pickup_minutes = max(0, time_diff.total_seconds() / 60)
 
-    # Temporal Features
     order_hour = order_dt.hour
     order_dayofweek = order_dt.dayofweek # Monday=0, Sunday=6
     is_weekend = 1 if order_dayofweek >= 5 else 0
 
-    # Cyclical Encoding
     order_hour_sin = np.sin(2 * np.pi * order_hour / 24)
     order_hour_cos = np.cos(2 * np.pi * order_hour / 24)
 
@@ -109,11 +114,12 @@ def create_temporal_features(order_dt, pickup_dt):
 
 def preprocess_inputs(user_inputs, expected_features):
     """
-    Transforms raw user inputs into the final, standardized feature vector 
-    expected by the trained ML model, correctly handling hidden characters.
+    Transforms raw user inputs into the final, standardized feature vector, 
+    using the exact feature names (including control characters/spaces).
     """
     
     # 1. Initialize DataFrame with ALL expected features set to 0
+    # This ensures all required OHE columns (like Category_Home) are present.
     df = pd.DataFrame(0, index=[0], columns=expected_features)
 
     # 2. Add Numerical and Engineered Features
@@ -126,9 +132,9 @@ def preprocess_inputs(user_inputs, expected_features):
     traffic_map = {'Low': 0, 'Medium': 1, 'High': 2, 'Jammed': 3}
     df['Traffic_Encoded'] = traffic_map.get(user_inputs['Traffic'], 1)
 
-    # 4. One-Hot Encoding (Set the relevant feature column to 1)
+    # 4. One-Hot Encoding (Map friendly names to ugly, required feature names)
     
-    # Weather (Mapping to feature names with \r control characters)
+    # Weather 
     weather_map = {
         'Sunny': '\rWeather_Sunny', 
         'Fog': 'Weather_Fog', 
@@ -140,7 +146,7 @@ def preprocess_inputs(user_inputs, expected_features):
     if weather_col and weather_col in df.columns: 
         df[weather_col] = 1
 
-    # Vehicle (Mapping to feature names with trailing spaces)
+    # Vehicle 
     vehicle_map = {
         'Motorcycle': 'Vehicle_motorcycle ', 
         'Scooter': 'Vehicle_scooter ', 
@@ -150,32 +156,33 @@ def preprocess_inputs(user_inputs, expected_features):
     if vehicle_col and vehicle_col in df.columns: 
         df[vehicle_col] = 1
 
-    # Area (Mapping to feature names with \n or trailing spaces)
+    # Area 
     area_map = {
         'Urban': 'Area_Urban ', 
         'Semi-Urban': 'Area_Semi-Urban ', 
-        'Other': '\nArea_Other'
+        'Other': '\nArea_Other' # The confirmed ugly name
     }
     area_col = area_map.get(user_inputs['Area'], None)
     if area_col and area_col in df.columns: 
         df[area_col] = 1
     
-    # Category (Mapping to feature name with \r control character)
+    # Category (Mapping selected category to its ugly name)
     category_map = {
         'Books': 'Category_Books', 
         'Clothing': 'Category_Clothing', 
         'Cosmetics': 'Category_Cosmetics', 
         'Electronics': 'Category_Electronics', 
         'Grocery': 'Category_Grocery', 
-        'Toys': '\rCategory_Toys',
+        'Toys': '\rCategory_Toys', # The confirmed ugly name
+        # All other OHE categories default to 0 in the initialization step (step 1).
     }
     category_col = category_map.get(user_inputs['Category'], None)
     if category_col and category_col in df.columns: 
         df[category_col] = 1
     
-    # Day of Week (0-6 -> 1.0-6.0)
-    order_dayofweek = user_inputs['Order_DayOfWeek'] + 1 # Convert 0-6 to 1-7
-    if order_dayofweek > 0 and order_dayofweek <= 6: # Filter out Sunday (7), which is the baseline
+    # Day of Week 
+    order_dayofweek = user_inputs['Order_DayOfWeek'] + 1 
+    if order_dayofweek > 0 and order_dayofweek <= 6: 
         day_col = f'Order_DayOfWeek_{order_dayofweek}.0'
         if day_col in df.columns: df[day_col] = 1
 
@@ -276,13 +283,13 @@ with col2:
     st.subheader("Environmental & Order Factors")
     
     traffic = st.selectbox("Traffic Condition", options=['Low', 'Medium', 'High', 'Jammed'], index=1)
-    # Note: 'Cloudy' and 'Rainy' are the implicit baseline in your model
+    # Note: 'Cloudy' and 'Rainy' are removed as they are the implicit baseline in your model
     weather = st.selectbox("Weather Condition", options=['Sunny', 'Fog', 'Sandstorms', 'Stormy', 'Windy'], index=0) 
     
     # UPDATED: Only vehicles present in the model training data
     vehicle = st.selectbox("Vehicle Type", options=['Scooter', 'Motorcycle', 'Van'], index=0)
     
-    # UPDATED: Only categories present in the model training data
+    # UPDATED: Only categories available for user selection
     category = st.selectbox("Order Category", options=['Electronics', 'Grocery', 'Books', 'Clothing', 'Cosmetics', 'Toys'], index=0)
 
 
@@ -309,14 +316,20 @@ if st.button("Predict Delivery Time"):
         'Vehicle': vehicle,
         'Area': area,
         'Category': category,
-        'Order_DayOfWeek': order_dayofweek # 0=Monday, 6=Sunday
+        'Order_DayOfWeek': order_dayofweek 
     }
 
     # 3. Preprocess and get the exact feature vector
     X_predict = preprocess_inputs(raw_inputs, EXPECTED_FEATURES)
 
-    # 4. Scaling (This line should now pass!)
-    X_scaled = scaler.transform(X_predict)
+    # 4. Scaling (This should now pass!)
+    try:
+        X_scaled = scaler.transform(X_predict)
+    except ValueError as e:
+        # If it still fails, print the column names to help debug the final hidden characters
+        st.error(f"Final Feature Mismatch Error: {e}")
+        st.warning("The feature names still do not match the fitted scaler. Please ensure the model files are compatible with the latest sklearn version.")
+        st.stop()
     
     # 5. Prediction
     prediction = model.predict(X_scaled)[0]
