@@ -19,9 +19,9 @@ try:
     st.sidebar.success("Model and Scaler loaded successfully.")
 
     # --- DEFINITIVE FIX: INCLUDES HIDDEN CHARACTERS AND MISSING OHE COLUMNS ---
-    # This list is constructed from the joblib metadata and the explicit error trace, 
-    # ensuring every feature name (including control characters and spaces) 
-    # and all required OHE columns are present and in the correct order.
+    # This list is constructed directly from the joblib metadata (feature_names_in_) 
+    # and includes all explicit features, missing features, and the confirmed control characters 
+    # that were causing the preceding ValueErrors.
     EXPECTED_FEATURES = [
         # Numerical and Engineered Features
         'Agent_Age', 
@@ -58,12 +58,17 @@ try:
         'Category_Cosmetics', 
         'Category_Electronics', 
         'Category_Grocery', 
-        '\rCategory_Toys', # Selected Category with hidden character
-        # MISSING CATEGORIES (Must be included and set to 0 if not selected)
+        # MISSING CATEGORIES (Set to 0 if not selected by user)
         'Category_Home',       
         'Category_Jewelry',    
         'Category_Kitchen',    
         'Category_Outdoors', 
+        'Category_Pet Supplies',
+        'Category_Shoes',
+        'Category_Skincare',
+        'Category_Snacks',
+        'Category_Sports', # <--- NEWLY CONFIRMED AND ADDED
+        '\rCategory_Toys', # The category with the confirmed hidden character
         
         # Day of Week OHE (Keeping '.0' suffix)
         'Order_DayOfWeek_1.0', 
@@ -174,6 +179,15 @@ def preprocess_inputs(user_inputs, expected_features):
         'Electronics': 'Category_Electronics', 
         'Grocery': 'Category_Grocery', 
         'Toys': '\rCategory_Toys', # The confirmed ugly name
+        'Home': 'Category_Home',
+        'Jewelry': 'Category_Jewelry',
+        'Kitchen': 'Category_Kitchen',
+        'Outdoors': 'Category_Outdoors',
+        'Pet Supplies': 'Category_Pet Supplies',
+        'Shoes': 'Category_Shoes',
+        'Skincare': 'Category_Skincare',
+        'Snacks': 'Category_Snacks',
+        'Sports': 'Category_Sports',
         # All other OHE categories default to 0 in the initialization step (step 1).
     }
     category_col = category_map.get(user_inputs['Category'], None)
@@ -290,7 +304,7 @@ with col2:
     vehicle = st.selectbox("Vehicle Type", options=['Scooter', 'Motorcycle', 'Van'], index=0)
     
     # UPDATED: Only categories available for user selection
-    category = st.selectbox("Order Category", options=['Electronics', 'Grocery', 'Books', 'Clothing', 'Cosmetics', 'Toys'], index=0)
+    category = st.selectbox("Order Category", options=['Electronics', 'Grocery', 'Books', 'Clothing', 'Cosmetics', 'Toys', 'Sports'], index=0)
 
 
 # --- PREDICTION TRIGGER ---
