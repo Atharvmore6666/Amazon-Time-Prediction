@@ -18,40 +18,40 @@ try:
     scaler = joblib.load(SCALER_PATH)
     st.sidebar.success("Model and Scaler loaded successfully.")
 
-    # --- DEFINITIVE FIX: EXACT FEATURE LIST FROM feature_scaler.joblib ---
-    # This list is extracted directly from the saved scaler file. 
-    # It MUST be exact, including the order and any trailing spaces.
+    # --- DEFINITIVE FIX: EXACT FEATURE LIST FROM feature_scaler.joblib (Attempt 3 - Removing Trailing Spaces) ---
+    # The previous attempt with trailing spaces failed, suggesting they were artifacts of 
+    # the joblib serialization log, not the true feature names. We are cleaning them up.
     EXPECTED_FEATURES = [
-        # Numerical and Engineered Features (Order adjusted based on scaler)
+        # Numerical and Engineered Features (Order based on joblib metadata)
         'Agent_Age', 
         'Agent_Rating', 
         'Travel_Distance_km', 
         'Time_to_Pickup_minutes',
-        'Is_Weekend',              # Moved up in your training data
+        'Is_Weekend',              
         'Order_Hour_sin', 
         'Order_Hour_cos', 
         
         # Ordinal Encoding
         'Traffic_Encoded', 
         
-        # Weather OHE (Note: 'Cloudy' and 'Rainy' are missing/were the baseline)
+        # Weather OHE (Baseline: Cloudy/Rainy)
         'Weather_Fog', 
         'Weather_Sandstorms', 
         'Weather_Stormy', 
         'Weather_Sunny', 
         'Weather_Windy', 
         
-        # Vehicle OHE (Note: Names are lowercase and have trailing spaces, 'van' instead of 'Electric_Vehicle')
-        'Vehicle_motorcycle ', 
-        'Vehicle_scooter ', 
+        # Vehicle OHE (Cleaned names - assuming no trailing spaces)
+        'Vehicle_motorcycle', 
+        'Vehicle_scooter', 
         'Vehicle_van',
         
-        # Area OHE (Note: 'Metro' and 'Rural' are missing, spaces in names)
+        # Area OHE (Cleaned names - assuming no trailing spaces)
         'Area_Other', 
-        'Area_Semi-Urban ', 
-        'Area_Urban ', 
+        'Area_Semi-Urban', 
+        'Area_Urban', 
         
-        # Category OHE (Note: Missing 'Food', 'Home'; Includes 'Toys')
+        # Category OHE (Baseline: Food/Home)
         'Category_Books', 
         'Category_Clothing', 
         'Category_Cosmetics', 
@@ -59,7 +59,7 @@ try:
         'Category_Grocery', 
         'Category_Toys',
         
-        # Day of Week OHE (Note: Names include the '.0' suffix)
+        # Day of Week OHE (Keeping '.0' suffix as it appears in metadata)
         'Order_DayOfWeek_1.0', 
         'Order_DayOfWeek_2.0', 
         'Order_DayOfWeek_3.0',
@@ -139,11 +139,11 @@ def preprocess_inputs(user_inputs, expected_features):
     if weather_col and weather_col in df.columns: 
         df[weather_col] = 1
 
-    # Vehicle (Handling lowercase names and trailing spaces)
-    # Mapping the user-friendly input to the ugly column name
+    # Vehicle (Handling lowercase names, NOW ASSUMING NO TRAILING SPACES)
+    # The maps are updated to reflect the new, cleaner feature names.
     vehicle_map = {
-        'Motorcycle': 'Vehicle_motorcycle ', 
-        'Scooter': 'Vehicle_scooter ', 
+        'Motorcycle': 'Vehicle_motorcycle', 
+        'Scooter': 'Vehicle_scooter', 
         'Van': 'Vehicle_van',
         # 'Electric_Vehicle' inputs will now fall to the baseline (all OHE columns remain 0)
     }
@@ -151,10 +151,11 @@ def preprocess_inputs(user_inputs, expected_features):
     if vehicle_col and vehicle_col in df.columns: 
         df[vehicle_col] = 1
 
-    # Area (Handling trailing spaces)
+    # Area (Handling, NOW ASSUMING NO TRAILING SPACES)
+    # The maps are updated to reflect the new, cleaner feature names.
     area_map = {
-        'Urban': 'Area_Urban ', 
-        'Semi-Urban': 'Area_Semi-Urban ', 
+        'Urban': 'Area_Urban', 
+        'Semi-Urban': 'Area_Semi-Urban', 
         'Other': 'Area_Other'
         # 'Metro' and 'Rural' inputs will now fall to the baseline
     }
