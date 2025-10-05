@@ -173,7 +173,7 @@ def preprocess_inputs(user_inputs, expected_features):
     category_map = {
         'Books': 'Category_Books', 
         'Clothing': 'Category_Clothing', 
-        'Cosmetics': 'Category_Cosmetics', 
+        'Category_Cosmetics': 'Category_Cosmetics', 
         'Electronics': 'Category_Electronics', 
         'Grocery': 'Category_Grocery', 
         'Toys': 'Category_Toys', 
@@ -257,9 +257,10 @@ h1 {
     font-weight: 500;
 }
 
-/* FIX: Ensure Metric Value (number) is a clearly visible green */
+/* FIX: Aggressive Green for Metric Value (Predicted Time, Equivalent Time, Time to Pickup) */
 .stMetric .stMetricValue {
-    color: #28a745 !important; /* Standard Success Green */
+    color: #10B981 !important; /* Bright Emerald Green (Tailwind green-500) */
+    font-weight: 700 !important; /* Make it bold for maximum visibility */
 }
 </style>
 """, unsafe_allow_html=True)
