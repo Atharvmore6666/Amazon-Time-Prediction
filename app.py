@@ -18,11 +18,9 @@ try:
     scaler = joblib.load(SCALER_PATH)
     st.sidebar.success("Model and Scaler loaded successfully.")
 
-    # --- FINAL DEFINITIVE FIX: MATCHING SCALER'S PARSED FEATURE NAMES ---
-    # Based on debug output, the scaler object loads the names without the 
-    # control characters (\r, \n), but requires specific trailing spaces.
+    # --- EXPECTED FEATURES (REQUIRED FOR SCALER COMPATIBILITY) ---
+    # These feature names must match the names the scaler was trained on exactly.
     EXPECTED_FEATURES = [
-        # Numerical and Engineered Features
         'Agent_Age', 
         'Agent_Rating', 
         'Travel_Distance_km', 
@@ -30,28 +28,18 @@ try:
         'Is_Weekend',              
         'Order_Hour_sin', 
         'Order_Hour_cos', 
-        
-        # Ordinal Encoding
         'Traffic_Encoded', 
-        
-        # Weather OHE (FIXED: Removed \r, matching clean expected names)
         'Weather_Fog', 
         'Weather_Sandstorms', 
         'Weather_Stormy', 
         'Weather_Sunny', 
         'Weather_Windy', 
-        
-        # Vehicle OHE (Confirmed trailing spaces)
         'Vehicle_motorcycle ', 
         'Vehicle_scooter ', 
-        'Vehicle_van', # No space
-        
-        # Area OHE (FIXED: Removed \n from 'Other', keeping space on Urban/Semi-Urban)
+        'Vehicle_van',
         'Area_Other',     
         'Area_Semi-Urban ', 
         'Area_Urban ', 
-        
-        # Category OHE (Reverted to clean names, no trailing spaces)
         'Category_Books', 
         'Category_Clothing', 
         'Category_Cosmetics', 
@@ -67,8 +55,6 @@ try:
         'Category_Snacks',
         'Category_Sports', 
         'Category_Toys', 
-        
-        # Day of Week OHE (Keeping '.0' suffix)
         'Order_DayOfWeek_1.0', 
         'Order_DayOfWeek_2.0', 
         'Order_DayOfWeek_3.0',
@@ -76,13 +62,12 @@ try:
         'Order_DayOfWeek_5.0', 
         'Order_DayOfWeek_6.0'
     ]
-    # --- END FINAL DEFINITIVE FIX ---
+    # --- END EXPECTED FEATURES ---
 
 except FileNotFoundError:
     st.error(f"File not found. Please ensure your model files are in the root directory next to this script.")
     st.stop()
 except Exception as e:
-    # Log the error for debugging but provide a user-friendly message
     st.error(f"An error occurred during model loading: {type(e).__name__}: {e}")
     st.info("Check the file paths and ensure the joblib files are valid.")
     st.stop()
@@ -136,20 +121,19 @@ def preprocess_inputs(user_inputs, expected_features):
 
     # 4. One-Hot Encoding (Map friendly names to the required feature names)
     
-    # Weather (Mapping selected weather to its required clean name)
-    # The baseline is assumed to be 'Cloudy'/'Rainy', which are not in this map.
+    # Weather 
     weather_map = {
-        'Sunny': 'Weather_Sunny', # FIXED: Removed \r
+        'Sunny': 'Weather_Sunny', 
         'Fog': 'Weather_Fog', 
         'Sandstorms': 'Weather_Sandstorms',
         'Stormy': 'Weather_Stormy', 
-        'Windy': 'Weather_Windy', # FIXED: Removed \r
+        'Windy': 'Weather_Windy', 
     }
     weather_col = weather_map.get(user_inputs['Weather'], None)
     if weather_col and weather_col in df.columns: 
         df[weather_col] = 1
 
-    # Vehicle (Mapping selected vehicle to its required name with trailing space where necessary)
+    # Vehicle 
     vehicle_map = {
         'Motorcycle': 'Vehicle_motorcycle ', 
         'Scooter': 'Vehicle_scooter ', 
@@ -159,17 +143,17 @@ def preprocess_inputs(user_inputs, expected_features):
     if vehicle_col and vehicle_col in df.columns: 
         df[vehicle_col] = 1
 
-    # Area (Mapping selected area to its required name. 'Other' is now clean.)
+    # Area 
     area_map = {
         'Urban': 'Area_Urban ', 
         'Semi-Urban': 'Area_Semi-Urban ', 
-        'Other': 'Area_Other' # FIXED: Removed \n
+        'Other': 'Area_Other' 
     }
     area_col = area_map.get(user_inputs['Area'], None)
     if area_col and area_col in df.columns: 
         df[area_col] = 1
     
-    # Category (Mapping selected category to its clean, required name without trailing space)
+    # Category 
     category_map = {
         'Books': 'Category_Books', 
         'Clothing': 'Category_Clothing', 
@@ -186,7 +170,6 @@ def preprocess_inputs(user_inputs, expected_features):
         'Skincare': 'Category_Skincare',
         'Snacks': 'Category_Snacks',
         'Sports': 'Category_Sports', 
-        # All other OHE categories default to 0 in the initialization step (step 1).
     }
     category_col = category_map.get(user_inputs['Category'], None)
     if category_col and category_col in df.columns: 
@@ -205,68 +188,94 @@ def preprocess_inputs(user_inputs, expected_features):
 # --- STREAMLIT APP LAYOUT & LOGIC ---
 
 st.set_page_config(
-    page_title="Delivery Time Predictor",
+    page_title="Amazon Logistics Delivery Time Predictor",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for the theme elements not covered by the config.toml
+# Custom CSS for the Amazon Theme (Primary: #FF9900, Secondary: #232F3E)
 st.markdown("""
 <style>
-/* Header/Title */
+/* Header/Title - Using the secondary Amazon Navy Blue */
 h1 {
-    color: #007bff; /* Blue */
+    color: #232F3E; 
     font-weight: 700;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+    margin-top: 10px;
 }
 
-/* Sidebar Styling - Secondary Background color from config.toml handles main bar */
-.stSidebar > div:first-child {
-    color: white; /* Text in dark sidebar */
-}
-
-/* Prediction Button (Styled for Blue theme) */
+/* Prediction Button - Primary Amazon Yellow/Orange */
 .stButton>button {
-    background-color: #007bff; /* Blue */
-    color: #ffffff; /* White text on blue button */
+    background-color: #FF9900; 
+    color: #111111; /* Black text on yellow button */
     font-weight: bold;
     border-radius: 6px;
     padding: 10px 20px;
     margin-top: 20px;
     border: none;
     transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .stButton>button:hover {
-    background-color: #0056b3; /* Darker blue on hover */
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    background-color: #F3A847; /* Slightly darker orange on hover */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
 }
 
 /* Metric Boxes */
 .stMetric {
-    background-color: white;
+    background-color: #FFFFFF;
     padding: 15px;
     border-radius: 10px;
-    border: 1px solid #007bff; /* Blue border */
+    border: 1px solid #232F3E; /* Navy border for contrast */
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* FIX: Ensure Metric Label (title) is PURE BLACK for high contrast */
+/* Metric Label (title) - Dark Gray */
 .stMetric label {
-    color: #000000 !important; /* Pure Black */
+    color: #111111 !important; /* Black */
     font-weight: 500;
 }
 
-/* FIX: Aggressive Green for Metric Value (Predicted Time, Equivalent Time, Time to Pickup) */
+/* FIX: Metric Value Color - Primary Amazon Yellow/Orange */
 .stMetric .stMetricValue {
-    color: #10B981 !important; /* Bright Emerald Green (Tailwind green-500) */
-    font-weight: 700 !important; /* Make it bold for maximum visibility */
+    color: #FF9900 !important; /* Amazon Primary Yellow/Orange */
+    font-weight: 900 !important; 
+}
+
+/* Logo Placeholder - Styled to reflect the brand's primary colors */
+.logo-container {
+    padding-bottom: 20px;
+    padding-top: 10px;
+}
+
+.logo-placeholder {
+    display: inline-block;
+    font-size: 28px;
+    font-weight: 800;
+    color: #232F3E; /* Navy Text */
+}
+
+/* Highlight for the 'smile' effect in the logo */
+.logo-highlight {
+    color: #FF9900; /* Yellow/Orange */
+    margin-left: 2px;
 }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("📦 Optimized Delivery Time Predictor")
-st.markdown("Predict the total delivery time (in minutes) using the Gradient Boosting Model.")
+# Logo Placeholder (Mimicking the look of the Amazon logo/branding)
+st.markdown("""
+<div class="logo-container">
+    <span class="logo-placeholder">
+        amazon
+        <span class="logo-highlight">Logistics</span>
+    </span>
+</div>
+""", unsafe_allow_html=True)
+
+st.title("Delivery Time Predictor")
+st.markdown("Use this tool to predict the total delivery time (in minutes) for **Amazon Logistics** deliveries.")
 
 # --- USER INPUTS ---
 
@@ -300,20 +309,16 @@ with col1:
     drop_lat = st.number_input("Drop-off Latitude", value=12.98, format="%.4f")
     drop_lon = st.number_input("Drop-off Longitude", value=77.58, format="%.4f")
     
-    # UPDATED: Only areas present in the model training data
     area = st.selectbox("Delivery Area Type", options=['Urban', 'Other', 'Semi-Urban'], index=0)
 
 with col2:
     st.subheader("Environmental & Order Factors")
     
     traffic = st.selectbox("Traffic Condition", options=['Low', 'Medium', 'High', 'Jammed'], index=1)
-    # Note: 'Cloudy' and 'Rainy' are removed as they are the implicit baseline in your model
     weather = st.selectbox("Weather Condition", options=['Sunny', 'Fog', 'Sandstorms', 'Stormy', 'Windy'], index=0) 
     
-    # UPDATED: Only vehicles present in the model training data
     vehicle = st.selectbox("Vehicle Type", options=['Scooter', 'Motorcycle', 'Van'], index=0)
     
-    # UPDATED: Only categories available for user selection
     category = st.selectbox("Order Category", options=['Electronics', 'Grocery', 'Books', 'Clothing', 'Cosmetics', 'Toys', 'Sports'], index=0)
 
 
@@ -346,7 +351,7 @@ if st.button("Predict Delivery Time"):
     # 3. Preprocess and get the exact feature vector
     X_predict = preprocess_inputs(raw_inputs, EXPECTED_FEATURES)
 
-    # 4. Scaling (This should now pass!)
+    # 4. Scaling
     try:
         X_scaled = scaler.transform(X_predict)
         
@@ -371,17 +376,8 @@ if st.button("Predict Delivery Time"):
 
 
     except ValueError as e:
-        # We keep this debug code for extreme cases, but the previous fix should prevent it.
-        st.error(f"Final Feature Mismatch Error: {e}")
-        st.warning("The feature names still do not match the fitted scaler. This indicates a deeply nested issue with the saved model files.")
-        
-        # --- DEBUG STEP: Print the features for comparison ---
-        st.write("--- Final Debug Information (Copy this if the error persists) ---")
-        st.write("Expected Features (from scaler.feature_names_in_):")
-        st.code(list(scaler.feature_names_in_))
+        st.error(f"Prediction Feature Mismatch Error: {e}")
+        st.warning("The feature names still do not match the fitted scaler. Please ensure the model files are correct.")
         st.write("Generated Features (X_predict.columns):")
         st.code(list(X_predict.columns))
-        st.write("-------------------------------------")
-        # --- END DEBUG STEP ---
-        
         st.stop()
