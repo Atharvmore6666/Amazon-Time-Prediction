@@ -22,6 +22,8 @@ try:
     # This list is constructed directly from the joblib metadata (feature_names_in_) 
     # and includes all explicit features, missing features, and the confirmed control characters 
     # that were causing the preceding ValueErrors.
+    # CRITICAL FIX: Adding trailing spaces to all Category OHE features (except \rCategory_Toys)
+    # as they were implicitly flagged as missing due to name mismatch (likely missing space).
     EXPECTED_FEATURES = [
         # Numerical and Engineered Features
         'Agent_Age', 
@@ -53,22 +55,23 @@ try:
         'Area_Urban ', 
         
         # Category OHE (EXPANDED list including all OHE columns required by the scaler)
-        'Category_Books', 
-        'Category_Clothing', 
-        'Category_Cosmetics', 
-        'Category_Electronics', 
-        'Category_Grocery', 
+        # ALL Category features below (except \rCategory_Toys) now have a trailing space.
+        'Category_Books ', 
+        'Category_Clothing ', 
+        'Category_Cosmetics ', 
+        'Category_Electronics ', 
+        'Category_Grocery ', 
         # MISSING CATEGORIES (Set to 0 if not selected by user)
-        'Category_Home',       
-        'Category_Jewelry',    
-        'Category_Kitchen',    
-        'Category_Outdoors', 
-        'Category_Pet Supplies',
-        'Category_Shoes',
-        'Category_Skincare',
-        'Category_Snacks',
-        'Category_Sports', # <--- NEWLY CONFIRMED AND ADDED
-        '\rCategory_Toys', # The category with the confirmed hidden character
+        'Category_Home ',       
+        'Category_Jewelry ',    
+        'Category_Kitchen ',    
+        'Category_Outdoors ', 
+        'Category_Pet Supplies ',
+        'Category_Shoes ',
+        'Category_Skincare ',
+        'Category_Snacks ',
+        'Category_Sports ', 
+        '\rCategory_Toys', # The category with the confirmed hidden character, no trailing space.
         
         # Day of Week OHE (Keeping '.0' suffix)
         'Order_DayOfWeek_1.0', 
@@ -172,22 +175,23 @@ def preprocess_inputs(user_inputs, expected_features):
         df[area_col] = 1
     
     # Category (Mapping selected category to its ugly name)
+    # CRITICAL FIX: Adding trailing space to all category names here to match the EXPECTED_FEATURES list.
     category_map = {
-        'Books': 'Category_Books', 
-        'Clothing': 'Category_Clothing', 
-        'Cosmetics': 'Category_Cosmetics', 
-        'Electronics': 'Category_Electronics', 
-        'Grocery': 'Category_Grocery', 
-        'Toys': '\rCategory_Toys', # The confirmed ugly name
-        'Home': 'Category_Home',
-        'Jewelry': 'Category_Jewelry',
-        'Kitchen': 'Category_Kitchen',
-        'Outdoors': 'Category_Outdoors',
-        'Pet Supplies': 'Category_Pet Supplies',
-        'Shoes': 'Category_Shoes',
-        'Skincare': 'Category_Skincare',
-        'Snacks': 'Category_Snacks',
-        'Sports': 'Category_Sports',
+        'Books': 'Category_Books ', 
+        'Clothing': 'Category_Clothing ', 
+        'Cosmetics': 'Category_Cosmetics ', 
+        'Electronics': 'Category_Electronics ', 
+        'Grocery': 'Category_Grocery ', 
+        'Toys': '\rCategory_Toys', # The confirmed ugly name (no space)
+        'Home': 'Category_Home ',
+        'Jewelry': 'Category_Jewelry ',
+        'Kitchen': 'Category_Kitchen ',
+        'Outdoors': 'Category_Outdoors ',
+        'Pet Supplies': 'Category_Pet Supplies ',
+        'Shoes': 'Category_Shoes ',
+        'Skincare': 'Category_Skincare ',
+        'Snacks': 'Category_Snacks ',
+        'Sports': 'Category_Sports ',
         # All other OHE categories default to 0 in the initialization step (step 1).
     }
     category_col = category_map.get(user_inputs['Category'], None)
