@@ -257,9 +257,9 @@ h1 {
     font-weight: 500;
 }
 
-/* FIX: Ensure Metric Value (number) is a deep green (non-neon) */
+/* FIX: Ensure Metric Value (number) is a clearly visible green */
 .stMetric .stMetricValue {
-    color: #196f3d !important; /* Deep Forest Green */
+    color: #28a745 !important; /* Standard Success Green */
 }
 </style>
 """, unsafe_allow_html=True)
