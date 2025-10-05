@@ -340,7 +340,17 @@ if st.button("Predict Delivery Time"):
     except ValueError as e:
         # If it still fails, print the column names to help debug the final hidden characters
         st.error(f"Final Feature Mismatch Error: {e}")
-        st.warning("The feature names still do not match the fitted scaler. Please ensure the model files are compatible with the latest sklearn version.")
+        st.warning("The feature names still do not match the fitted scaler. We need to print the expected features from the scaler object to debug the hidden characters.")
+        
+        # --- DEBUG STEP: Print the features for comparison ---
+        st.write("--- Debug Information (Copy this) ---")
+        st.write("Expected Features (from scaler.feature_names_in_):")
+        st.code(list(scaler.feature_names_in_))
+        st.write("Generated Features (X_predict.columns):")
+        st.code(list(X_predict.columns))
+        st.write("-------------------------------------")
+        # --- END DEBUG STEP ---
+        
         st.stop()
     
     # 5. Prediction
