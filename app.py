@@ -10,13 +10,14 @@ from math import radians, sin, cos, sqrt, atan2
 # Define paths relative to the app.py file
 # FIX: Use the script's directory (__file__) to ensure paths are absolute and reliable
 current_dir = os.path.dirname(__file__)
-MODEL_DIR = os.path.join(current_dir, 'model')
-MODEL_PATH = os.path.join(MODEL_DIR, 'best_delivery_time_predictor.joblib')
-SCALER_PATH = os.path.join(MODEL_DIR, 'feature_scaler.joblib')
+# --- EDITED PATHS TO LOOK IN THE ROOT DIRECTORY ---
+MODEL_PATH = os.path.join(current_dir, 'best_delivery_time_predictor.joblib')
+SCALER_PATH = os.path.join(current_dir, 'feature_scaler.joblib')
+# --- END EDITED PATHS ---
 
 # IMPORTANT: You must save the list of expected features from your training data!
 # For deployment, we assume the feature list is saved here:
-# COLUMNS_PATH = os.path.join(MODEL_DIR, 'model_features.joblib') 
+# COLUMNS_PATH = os.path.join(current_dir, 'model_features.joblib') 
 
 try:
     # Load the trained model and scaler
@@ -37,7 +38,7 @@ try:
 
 except FileNotFoundError as e:
     # Update error message to confirm the full path being checked
-    st.error(f"File not found: {MODEL_PATH}. Please ensure your model files are in a directory named 'model/' next to this script.")
+    st.error(f"File not found: {MODEL_PATH}. Please ensure your model files are in the repository's root directory next to this script.")
     st.stop()
 except Exception as e:
     st.error(f"An error occurred during model loading: {e}")
